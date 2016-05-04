@@ -7,6 +7,7 @@ import static uk.gov.justice.services.messaging.JsonObjects.getUUID;
 import static uk.gov.justice.services.messaging.JsonObjects.getUUIDs;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,6 +31,7 @@ public class JsonObjectMetadata implements Metadata {
     public static final String STREAM_ID = "id";
     public static final String VERSION = "version";
     public static final String CAUSATION = "causation";
+    public static final String CUSTOM_HEADERS = "custom-headers";
 
     private static final String[] USER_ID_PATH = new String[]{CONTEXT, USER_ID};
     private static final String[] CLIENT_CORRELATION_PATH = new String[]{CORRELATION, CLIENT_ID};
@@ -104,6 +106,11 @@ public class JsonObjectMetadata implements Metadata {
     @Override
     public Optional<Long> version() {
         return getLong(metadata, VERSION_PATH);
+    }
+
+    @Override
+    public Optional<Map> customHeaders() {
+        return metadata.containsKey(CUSTOM_HEADERS) ? Optional.of(metadata.getJsonObject(CUSTOM_HEADERS)) : Optional.empty();
     }
 
     @Override

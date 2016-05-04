@@ -1,6 +1,7 @@
 package uk.gov.justice.services.messaging;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -68,6 +69,13 @@ public interface Metadata {
      * @return the optional sequence id
      */
     Optional<Long> version();
+
+    /**
+     * Get the custom headers for the response.
+     *
+     * @return custom headers
+     */
+    Optional<Map> customHeaders();
 
     /**
      * Return the whole metadata as a JsonObject.

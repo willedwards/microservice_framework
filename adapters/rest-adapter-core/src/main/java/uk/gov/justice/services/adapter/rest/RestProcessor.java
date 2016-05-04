@@ -12,6 +12,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 import uk.gov.justice.services.adapter.rest.envelope.RestEnvelopeBuilderFactory;
 import uk.gov.justice.services.messaging.JsonEnvelope;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -85,7 +86,10 @@ public class RestProcessor {
         } else if (result.payload() == NULL) {
             return status(NOT_FOUND).build();
         } else {
-            return status(OK).entity(responseBodyGenerator.apply(result)).build();
+            Response.ResponseBuilder responseBuilder = status(OK).entity(responseBodyGenerator.apply(result));
+            Map<String, String> customHeaders = envelope.metadata().customHeaders().orElse(Collections.emptyMap());
+            customHeaders.entrySet().forEach(e -> responseBuilder.header(e.getKey(), e.getValue()));
+            return responseBuilder.build();
         }
     }
 }

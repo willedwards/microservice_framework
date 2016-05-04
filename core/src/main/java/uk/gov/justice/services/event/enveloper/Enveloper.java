@@ -1,8 +1,11 @@
 package uk.gov.justice.services.event.enveloper;
 
 import static java.lang.String.format;
+import static java.util.Arrays.asList;
+import static java.util.Collections.emptyMap;
 import static uk.gov.justice.services.messaging.DefaultJsonEnvelope.envelopeFrom;
 import static uk.gov.justice.services.messaging.JsonObjectMetadata.CAUSATION;
+import static uk.gov.justice.services.messaging.JsonObjectMetadata.CUSTOM_HEADERS;
 import static uk.gov.justice.services.messaging.JsonObjectMetadata.ID;
 import static uk.gov.justice.services.messaging.JsonObjectMetadata.NAME;
 import static uk.gov.justice.services.messaging.JsonObjectMetadata.metadataFrom;
@@ -15,7 +18,7 @@ import uk.gov.justice.services.messaging.JsonEnvelope;
 import uk.gov.justice.services.messaging.JsonObjects;
 import uk.gov.justice.services.messaging.Metadata;
 
-import java.util.Arrays;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -74,6 +77,19 @@ public class Enveloper {
         return x -> envelopeFrom(buildMetaData(envelope.metadata(), name), x == null ? JsonValue.NULL : objectToJsonValueConverter.convert(x));
     }
 
+    /**
+     * Provides a function that wraps the provided object into a new {@link JsonEnvelope} using
+     * custom headers and metadata from the given envelope, except the name.
+     *
+     * @param envelope      - the envelope containing source metadata.
+     * @param customHeaders - the custom headers.
+     * @param name          - name of the payload.
+     * @return a function that wraps objects into an envelope.
+     */
+    public Function<Object, JsonEnvelope> withMetadataAndCustomHeadersFrom(final JsonEnvelope envelope, final Map<String, String> customHeaders, final String name) {
+        return x -> envelopeFrom(buildMetaData(envelope.metadata(), customHeaders, name), x == null ? JsonValue.NULL : objectToJsonValueConverter.convert(x));
+    }
+
     private Metadata buildMetaData(final Object eventObject, final Metadata metadata) {
         if (eventObject == null) {
             throw new IllegalArgumentException("Event object should not be null");
@@ -83,18 +99,26 @@ public class Enveloper {
             throw new InvalidEventException(format("Failed to map event. No event registered for %s", eventObject.getClass()));
         }
 
-        return buildMetaData(metadata, eventMap.get(eventObject.getClass()));
+        return buildMetaData(metadata, emptyMap(), eventMap.get(eventObject.getClass()));
     }
 
     private Metadata buildMetaData(final Metadata metadata, final String name) {
+        return buildMetaData(metadata, emptyMap(), name);
+    }
 
-        JsonObjectBuilder metadataBuilder = JsonObjects.createObjectBuilderWithFilter(metadata.asJsonObject(),
-                x -> !Arrays.asList(ID, NAME, CAUSATION).contains(x));
+    private Metadata buildMetaData(final Metadata metadata, final Map<String, String> customHeaders, final String name) {
+
+        final JsonObjectBuilder metadataBuilder = JsonObjects.createObjectBuilderWithFilter(metadata.asJsonObject(),
+                x -> !asList(ID, NAME, CAUSATION).contains(x));
+
+        final JsonObjectBuilder jsonObjectCustomHeader = Json.createObjectBuilder();
+        customHeaders.entrySet().forEach(e -> jsonObjectCustomHeader.add(e.getKey(), e.getValue()));
 
         final JsonObject jsonObject = metadataBuilder
                 .add(ID, UUID.randomUUID().toString())
                 .add(NAME, name)
                 .add(CAUSATION, createCausation(metadata))
+                .add(CUSTOM_HEADERS, jsonObjectCustomHeader)
                 .build();
 
         return metadataFrom(jsonObject);
