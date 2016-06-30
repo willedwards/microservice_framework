@@ -4,10 +4,12 @@ import static java.lang.String.format;
 import static org.hamcrest.CoreMatchers.notNullValue;
 import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.CoreMatchers.sameInstance;
+import static org.hamcrest.core.Is.is;
 import static org.junit.Assert.assertThat;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static uk.gov.justice.services.core.handler.HandlerMethod.handlerMethod;
 import static uk.gov.justice.services.core.handler.Handlers.handlerMethodsFrom;
 
 import uk.gov.justice.services.common.converter.StringToJsonObjectConverter;
@@ -20,6 +22,8 @@ import uk.gov.justice.services.messaging.JsonObjectEnvelopeConverter;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.nio.charset.Charset;
+import java.util.LinkedList;
+import java.util.List;
 
 import com.google.common.io.Resources;
 import org.junit.Before;
@@ -36,7 +40,6 @@ public class HandlerMethodTest {
 
     @Mock
     private SynchronousCommandHandler synchronousCommandHandler;
-
 
     private JsonEnvelope envelope;
 
@@ -70,37 +73,83 @@ public class HandlerMethodTest {
         assertThat(asyncHandlerInstance().toString(), notNullValue());
     }
 
+    @Test
+    public void shouldBeSynchronous() throws Exception {
+        assertThat(syncHandlerInstance().isSynchronous(), is(true));
+    }
+
+    @Test
+    public void shouldBeAsynchronous() throws Exception {
+        assertThat(asyncHandlerInstance().isSynchronous(), is(false));
+    }
+
     @Test(expected = IllegalArgumentException.class)
     public void shouldThrowExceptionWithNullHandlerInstance() {
-        new HandlerMethod(null, method(new AsynchronousCommandHandler(), "handles"), Void.TYPE);
+        handlerMethod(null, method(new AsynchronousCommandHandler(), "handles"), Void.TYPE);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void shouldThrowExceptionWithNullMethod() {
-        new HandlerMethod(asynchronousCommandHandler, null, Void.TYPE);
+        handlerMethod(asynchronousCommandHandler, null, Void.TYPE);
     }
 
     @Test(expected = InvalidHandlerException.class)
     public void shouldThrowExceptionWithSynchronousMethod() {
-        new HandlerMethod(asynchronousCommandHandler, method(new AsynchronousCommandHandler(), "handlesSync"), Void.TYPE);
+        handlerMethod(asynchronousCommandHandler, method(new AsynchronousCommandHandler(), "handlesSync"), Void.TYPE);
     }
 
     @Test(expected = InvalidHandlerException.class)
     public void shouldThrowExceptionWithAsynchronousMethod() {
-        new HandlerMethod(synchronousCommandHandler, method(new SynchronousCommandHandler(), "handlesAsync"), JsonEnvelope.class);
+        handlerMethod(synchronousCommandHandler, method(new SynchronousCommandHandler(), "handlesAsync"), JsonEnvelope.class);
+    }
+
+    @Test(expected = InvalidHandlerException.class)
+    public void shouldThrowExceptionWithAMethodWithNoParameters() {
+        handlerMethod(synchronousCommandHandler, method(new InvalidCommandHandler(), "handlesNoParameter"), JsonEnvelope.class);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void shouldThrowExceptionWithAMethodWithNonJsonEnvelopeParameter() {
+        handlerMethod(synchronousCommandHandler, method(new InvalidCommandHandler(), "handlesNonEnvelope"), JsonEnvelope.class);
     }
 
     @Test(expected = IllegalArgumentException.class)
     public void shouldOnlyAcceptVoidOrEnvelopeReturnTypes() {
-        new HandlerMethod(synchronousCommandHandler, method(new SynchronousCommandHandler(), "handles"), Object.class);
+        handlerMethod(synchronousCommandHandler, method(new SynchronousCommandHandler(), "handles"), Object.class);
+    }
+
+    @Test
+    public void shouldCallTraceLoggerForAsync() throws Exception {
+        final List<String> log = new LinkedList<>();
+        final AsynchronousCommandHandler commandHandler = new AsynchronousCommandHandler();
+        new HandlerMethod(commandHandler, method(commandHandler, "handles"), Void.TYPE,
+                (logger) -> (stringSupplier) -> log.add(stringSupplier.get()))
+                .execute(envelope);
+
+        assertThat(log.size(), is(2));
+        assertThat(log.get(0), is("Dispatching to handler uk.gov.justice.services.core.handler.HandlerMethodTest$AsynchronousCommandHandler.handles : {\"id\":\"861c9430-7bc6-4bf0-b549-6534394b8d65\",\"name\":\"test.command.do-something\",\"correlation\":\"d51597dc-2526-4c71-bd08-5031c79f11e1\",\"session\":\"45b0c3fe-afe6-4652-882f-7882d79eadd9\",\"user\":\"72251abb-5872-46e3-9045-950ac5bae399\",\"causation\":[\"cd68037b-2fcf-4534-b83d-a9f08072f2ca\",\"43464b22-04c1-4d99-8359-82dc1934d763\"]}"));
+        assertThat(log.get(1), is("Response from handler class uk.gov.justice.services.core.handler.HandlerMethodTest$AsynchronousCommandHandler.handles with id 861c9430-7bc6-4bf0-b549-6534394b8d65 was void"));
+    }
+
+    @Test
+    public void shouldCallTraceLoggerForSync() throws Exception {
+        final List<String> log = new LinkedList<>();
+        final SynchronousCommandHandler commandHandler = new SynchronousCommandHandler();
+        new HandlerMethod(commandHandler, method(commandHandler, "handles"), JsonEnvelope.class,
+                (logger) -> (stringSupplier) -> log.add(stringSupplier.get()))
+                .execute(envelope);
+
+        assertThat(log.size(), is(2));
+        assertThat(log.get(0), is("Dispatching to handler uk.gov.justice.services.core.handler.HandlerMethodTest$SynchronousCommandHandler.handles : {\"id\":\"861c9430-7bc6-4bf0-b549-6534394b8d65\",\"name\":\"test.command.do-something\",\"correlation\":\"d51597dc-2526-4c71-bd08-5031c79f11e1\",\"session\":\"45b0c3fe-afe6-4652-882f-7882d79eadd9\",\"user\":\"72251abb-5872-46e3-9045-950ac5bae399\",\"causation\":[\"cd68037b-2fcf-4534-b83d-a9f08072f2ca\",\"43464b22-04c1-4d99-8359-82dc1934d763\"]}"));
+        assertThat(log.get(1), is("Response received from handler class uk.gov.justice.services.core.handler.HandlerMethodTest$SynchronousCommandHandler.handles : {\"id\":\"861c9430-7bc6-4bf0-b549-6534394b8d65\",\"name\":\"test.command.do-something\",\"correlation\":\"d51597dc-2526-4c71-bd08-5031c79f11e1\",\"session\":\"45b0c3fe-afe6-4652-882f-7882d79eadd9\",\"user\":\"72251abb-5872-46e3-9045-950ac5bae399\",\"causation\":[\"cd68037b-2fcf-4534-b83d-a9f08072f2ca\",\"43464b22-04c1-4d99-8359-82dc1934d763\"]}"));
     }
 
     private HandlerMethod asyncHandlerInstance() {
-        return new HandlerMethod(asynchronousCommandHandler, method(new AsynchronousCommandHandler(), "handles"), Void.TYPE);
+        return handlerMethod(asynchronousCommandHandler, method(new AsynchronousCommandHandler(), "handles"), Void.TYPE);
     }
 
     private HandlerMethod syncHandlerInstance() {
-        return new HandlerMethod(synchronousCommandHandler, method(new SynchronousCommandHandler(), "handles"), JsonEnvelope.class);
+        return handlerMethod(synchronousCommandHandler, method(new SynchronousCommandHandler(), "handles"), JsonEnvelope.class);
     }
 
     private Method method(final Object object, final String methofName) {
@@ -136,6 +185,18 @@ public class HandlerMethodTest {
 
         @Handles("test-context.command.create-something-else")
         public void handlesAsync(final JsonEnvelope envelope) {
+        }
+    }
+
+    public static class InvalidCommandHandler {
+
+        @Handles("test-context.command.create-something")
+        public JsonEnvelope handlesNoParameter() {
+            return null;
+        }
+
+        @Handles("test-context.command.create-something-else")
+        public void handlesNonEnvelope(final Object envelope) {
         }
     }
 }

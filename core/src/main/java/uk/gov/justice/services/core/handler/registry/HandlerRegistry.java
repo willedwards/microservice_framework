@@ -1,6 +1,7 @@
 package uk.gov.justice.services.core.handler.registry;
 
 import static java.lang.String.format;
+import static uk.gov.justice.services.core.handler.HandlerMethod.handlerMethod;
 import static uk.gov.justice.services.core.handler.Handlers.handlerMethodsFrom;
 
 import uk.gov.justice.services.core.annotation.Handles;
@@ -47,8 +48,7 @@ public class HandlerRegistry {
      * @param method  handler method to register.
      */
     private void register(final Object handler, final Method method) {
-
-        final HandlerMethod handlerMethod = new HandlerMethod(handler, method, method.getReturnType());
+        final HandlerMethod handlerMethod = handlerMethod(handler, method, method.getReturnType());
         final String name = method.getAnnotation(Handles.class).value();
         if (handlerMethods.containsKey(name)) {
             throw new DuplicateHandlerException(

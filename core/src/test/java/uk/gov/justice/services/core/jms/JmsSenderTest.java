@@ -73,8 +73,7 @@ public class JmsSenderTest {
     }
 
     private JmsSender jmsSenderWithComponent(final Component component) {
-        final JmsSender jmsSender = new JmsSender(component, jmsDestinations, jmsEnvelopeSender);
-        return jmsSender;
+        return new JmsSender(component, jmsDestinations, jmsEnvelopeSender);
     }
 
 }

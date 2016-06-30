@@ -1,24 +1,29 @@
 package uk.gov.justice.services.messaging.logging;
 
-import org.slf4j.Logger;
-
+import java.util.function.Function;
 import java.util.function.Supplier;
-;
+
+import org.slf4j.Logger;
 
 public final class LoggerUtils {
 
-    private LoggerUtils(){}
+    private LoggerUtils() {
+    }
 
     public static void trace(final Logger logger,
-                           final Supplier<String> supplier) {
+                             final Supplier<String> supplier) {
 
-        if(logger.isTraceEnabled()) {
+        if (logger.isTraceEnabled()) {
             try {
                 logger.trace(supplier.get());
             } catch (Exception e) {
                 logger.error("Could not generate trace log message", e);
             }
         }
+    }
+
+    public static Function<Logger, Tracer> tracer() {
+        return (logger) -> (stringSupplier) -> LoggerUtils.trace(logger, stringSupplier);
     }
 
 }
