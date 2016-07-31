@@ -8,6 +8,7 @@ import java.util.UUID;
  * Entity class to represent a persisted event.
  */
 @Value
+@AllArgsConstructor
 @EqualsAndHashCode
 @ToString(includeFieldNames=true)
 public class EventLog {
