@@ -12,6 +12,7 @@ import java.util.UUID;
 @ToString(includeFieldNames=true)
 public class EventLog {
 
+
     private UUID id;
     private UUID streamId;
     private Long sequenceId;
